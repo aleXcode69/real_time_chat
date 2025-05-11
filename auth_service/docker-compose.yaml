@@ -31,6 +31,7 @@ services:
       - KEYCLOAK_DATABASE_USER=bn_keycloak
       - KEYCLOAK_DATABASE_PASSWORD=bitnami
       - KEYCLOAK_DATABASE_SCHEMA_UPDATE=update
+      - PROXY_ADDRESS_FORWARDING=true
     volumes:
       - ./keycloak_data:/bitnami/keycloak
       - ./realms:/opt/bitnami/keycloak/data/import

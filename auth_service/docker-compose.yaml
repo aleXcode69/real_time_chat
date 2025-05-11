@@ -1,0 +1,61 @@
+version: "3.8"
+
+services:
+  postgresql:
+    image: bitnami/postgresql:17.5.0
+    container_name: keycloak_postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRESQL_USERNAME=bn_keycloak
+      - POSTGRESQL_PASSWORD=bitnami
+      - POSTGRESQL_DATABASE=bitnami_keycloak
+    volumes:
+      - ./postgresql_data:/bitnami/postgresql
+    networks:
+      - keycloak_network
+
+  keycloak:
+    image: bitnami/keycloak:26.2.4
+    container_name: keycloak
+    restart: unless-stopped
+    depends_on:
+      - postgresql
+    expose:
+      - "8080"
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KEYCLOAK_DATABASE_HOST=postgresql
+      - KEYCLOAK_DATABASE_PORT=5432
+      - KEYCLOAK_DATABASE_NAME=bitnami_keycloak
+      - KEYCLOAK_DATABASE_USER=bn_keycloak
+      - KEYCLOAK_DATABASE_PASSWORD=bitnami
+      - KEYCLOAK_DATABASE_SCHEMA_UPDATE=update
+    volumes:
+      - ./keycloak_data:/bitnami/keycloak
+      - ./realms:/opt/bitnami/keycloak/data/import
+    networks:
+      - keycloak_network
+
+  nginx:
+    image: bitnami/nginx:1.28.0
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d/default.conf:/opt/bitnami/nginx/conf/server_blocks/my_server_block.conf
+      - ./nginx/certs:/certs:ro
+    depends_on:
+      - keycloak
+    networks:
+      - keycloak_network
+
+volumes:
+  postgresql_data:
+  keycloak_data:
+
+networks:
+  keycloak_network:
+    driver: bridge

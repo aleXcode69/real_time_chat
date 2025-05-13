@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>PKCE + Keycloak + Refresh</title>
+  <title>PKCE + Keycloak + Auto–Refresh</title>
   <style>
     body { font-family: sans-serif; padding: 2em; }
     #user-box { display: none; }
@@ -21,17 +21,18 @@
   </div>
 
   <script>
-    const clientId = "alltype";
-    const realm = "rtc";
+    const clientId    = "alltype";
+    const realm       = "rtc";
     const redirectUri = "http://localhost:8001/frontend/callback.html";
-    const keycloakBase = "https://dedup-gpn.ru/auth";
+    const keycloakBase= "https://dedup-gpn.ru/auth";
 
+    // PKCE
     function generateCodeVerifier() {
-      const array = new Uint8Array(64);
-      crypto.getRandomValues(array);
-      return btoa(String.fromCharCode(...array)).replace(/[^a-zA-Z0-9]/g, '').slice(0, 128);
+      const arr = new Uint8Array(64);
+      crypto.getRandomValues(arr);
+      return btoa(String.fromCharCode(...arr))
+        .replace(/[^a-zA-Z0-9]/g, '').slice(0, 128);
     }
-
     async function generateCodeChallenge(verifier) {
       const data = new TextEncoder().encode(verifier);
       const digest = await crypto.subtle.digest("SHA-256", data);
@@ -39,98 +40,120 @@
         .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
     }
 
+    // Сохранение auth и планирование обновления
+    function saveAuth(data) {
+      const auth = {
+        access_token : data.access_token,
+        refresh_token: data.refresh_token,
+        expires_at   : Date.now() + data.expires_in*1000
+      };
+      localStorage.setItem("auth", JSON.stringify(auth));
+      scheduleRefresh(auth.expires_at);
+    }
+    function calcRefreshTimeout(expiresAt) {
+      const msLeft = expiresAt - Date.now();
+      return Math.max(msLeft - 30*1000, 0);
+    }
+    function scheduleRefresh(expiresAt) {
+      clearTimeout(window._refreshTimer);
+      const timeout = calcRefreshTimeout(expiresAt);
+      window._refreshTimer = setTimeout(async () => {
+        const raw = localStorage.getItem("auth");
+        if (!raw) return;
+        const { refresh_token } = JSON.parse(raw);
+        await tryRefresh(refresh_token);
+      }, timeout);
+    }
+
+    // Логин — открытие popup
     async function login() {
       const verifier = generateCodeVerifier();
       sessionStorage.setItem("pkce_code_verifier", verifier);
       const challenge = await generateCodeChallenge(verifier);
 
-      const url = `${keycloakBase}/realms/${realm}/protocol/openid-connect/auth?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=openid&code_challenge=${challenge}&code_challenge_method=S256`;
+      const url = `${keycloakBase}/realms/${realm}/protocol/openid-connect/auth`
+        + `?client_id=${clientId}`
+        + `&response_type=code`
+        + `&redirect_uri=${encodeURIComponent(redirectUri)}`
+        + `&scope=openid`
+        + `&code_challenge=${challenge}`
+        + `&code_challenge_method=S256`;
 
-      window.open(url, "keycloak-login", "width=500,height=600");
+      window.open(url, "kc-login", "width=500,height=600");
     }
 
+    // Обработка сообщения из callback.html
     window.addEventListener("message", async (event) => {
       const { code } = event.data;
       if (!code) return;
 
       const verifier = sessionStorage.getItem("pkce_code_verifier");
-
-      const params = new URLSearchParams();
-      params.append("grant_type", "authorization_code");
-      params.append("client_id", clientId);
-      params.append("code", code);
-      params.append("redirect_uri", redirectUri);
-      params.append("code_verifier", verifier);
-
-      const res = await fetch(`${keycloakBase}/realms/${realm}/protocol/openid-connect/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: params
+      const params = new URLSearchParams({
+        grant_type   : "authorization_code",
+        client_id    : clientId,
+        code,
+        redirect_uri : redirectUri,
+        code_verifier: verifier
       });
 
+      const res  = await fetch(
+        `${keycloakBase}/realms/${realm}/protocol/openid-connect/token`,
+        { method:"POST", headers:{"Content-Type":"application/x-www-form-urlencoded"}, body: params }
+      );
       const text = await res.text();
       if (!res.ok) {
-        console.error("Ошибка входа:", text);
+        console.error("Login error:", text);
         alert("Ошибка входа");
         return;
       }
 
       const data = JSON.parse(text);
-      const auth = {
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-        expires_at: Date.now() + data.expires_in * 1000
-      };
-      localStorage.setItem("auth", JSON.stringify(auth));
-      showUser(auth.access_token);
+      saveAuth(data);
+      showUser(data.access_token);
     });
 
+    // Refresh без popup
     async function tryRefresh(refreshToken) {
-      const params = new URLSearchParams();
-      params.append("grant_type", "refresh_token");
-      params.append("client_id", clientId);
-      params.append("refresh_token", refreshToken);
-
-      const res = await fetch(`${keycloakBase}/realms/${realm}/protocol/openid-connect/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: params
+      const params = new URLSearchParams({
+        grant_type   : "refresh_token",
+        client_id    : clientId,
+        refresh_token: refreshToken
       });
-
+      const res  = await fetch(
+        `${keycloakBase}/realms/${realm}/protocol/openid-connect/token`,
+        { method:"POST", headers:{"Content-Type":"application/x-www-form-urlencoded"}, body: params }
+      );
       const text = await res.text();
       if (!res.ok) {
-        console.warn("Не удалось обновить токен:", text);
+        console.warn("Refresh failed:", text);
         logout();
         return;
       }
-
       const data = JSON.parse(text);
-      const auth = {
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-        expires_at: Date.now() + data.expires_in * 1000
-      };
-      localStorage.setItem("auth", JSON.stringify(auth));
-      showUser(auth.access_token);
+      saveAuth(data);
+      showUser(data.access_token);
     }
 
+    // Показ UI
     function showUser(token) {
       document.getElementById("login-box").style.display = "none";
       document.getElementById("user-box").style.display = "block";
       document.getElementById("token-info").innerText = token;
     }
-
     function logout() {
       localStorage.removeItem("auth");
+      clearTimeout(window._refreshTimer);
       location.reload();
     }
 
+    // При запуске
     window.onload = () => {
       const raw = localStorage.getItem("auth");
       if (raw) {
         const auth = JSON.parse(raw);
         if (Date.now() < auth.expires_at) {
           showUser(auth.access_token);
+          scheduleRefresh(auth.expires_at);
         } else {
           tryRefresh(auth.refresh_token);
         }

@@ -1,0 +1,22 @@
+{
+  "client": {
+    "token": {
+      "jwks_public_endpoint": "https://dedup-gpn.ru/auth/realms/rtc/protocol/openid-connect/certs"
+    },
+    "allowed_origins": ["*"]
+  },
+  "admin": {
+    "enabled": true,
+    "password": "admin",
+    "secret": "admin"
+  },
+  "http_api": {
+    "key": "my_api_key"
+  },
+  "channel": {
+    "without_namespace": {
+      "allow_subscribe_for_client": false,
+      "allow_publish_for_client": false
+    }
+  }
+}

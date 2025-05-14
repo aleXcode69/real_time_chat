@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"net"
 
 	"google.golang.org/grpc"
+	_ "github.com/lib/pq"
 )
 
 type server struct {
@@ -49,6 +51,15 @@ func main() {
 		log.Fatalf("Failed to listen on port 50051: %v", err)
 		return
 	}
+	defer listener.Close()
+
+	db, err := sql.Open("postgres", "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable")
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+		return
+	}
+	defer db.Close()
+	InitDB(New(db))
 
 	grpcServer := grpc.NewServer()
 	RegisterCentrifugoProxyServer(grpcServer, &server{})

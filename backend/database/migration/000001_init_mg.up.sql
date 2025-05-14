@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS public."user"
 CREATE TABLE IF NOT EXISTS public.channel
 (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL UNIQUE,
     can_subscribe_anyone BOOLEAN NOT NULL DEFAULT false,
     can_publish_anyone BOOLEAN NOT NULL DEFAULT false
 );

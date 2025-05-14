@@ -2,11 +2,18 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>PKCE + Keycloak + Auto–Refresh (Fixed)</title>
+  <title>PKCE + Keycloak + Centrifugo Chat</title>
+  <script src="https://unpkg.com/centrifuge@5.3.5/dist/centrifuge.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 2em; }
-    #user-box { display: none; }
-    #login-box { display: none; }
+    body { font-family: sans-serif; background: #222; color: #eee; }
+    #user-box, #chat { display: none; }
+    #chat { width: 400px; margin: 40px auto; background: #333; border-radius: 8px; padding: 20px; }
+    #messages { height: 300px; overflow-y: auto; background: #222; border-radius: 4px; padding: 10px; margin-bottom: 10px; }
+    #input, #channelForm { display: flex; margin-bottom: 10px; }
+    #input input, #channelForm input { flex: 1; padding: 8px; border: none; border-radius: 4px 0 0 4px; }
+    #input button, #channelForm button { padding: 8px 16px; border: none; background: #4caf50; color: #fff; border-radius: 0 4px 4px 0; cursor: pointer; }
+    #input button:hover, #channelForm button:hover { background: #388e3c; }
+    #channelName { margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -20,13 +27,27 @@
     <button onclick="logout()">Выйти</button>
   </div>
 
+  <div id="chat">
+    <h2>Динамический чат Centrifugo</h2>
+    <form id="channelForm">
+      <input type="text" id="channelInput" autocomplete="off" placeholder="Введите имя канала..." required />
+      <button type="submit">Подписаться</button>
+    </form>
+    <div id="channelName"></div>
+    <div id="messages"></div>
+    <form id="input" style="display:none;">
+      <input type="text" id="messageInput" autocomplete="off" placeholder="Введите сообщение..." required />
+      <button type="submit">Отправить</button>
+    </form>
+  </div>
+
   <script>
+    // --- Keycloak PKCE Auth ---
     const clientId     = "alltype";
     const realm        = "rtc";
-    const redirectUri  = "http://localhost:8001/frontend/callback.html";
+    const redirectUri  = "http://localhost:8080/callback.html";
     const keycloakBase = "https://dedup-gpn.ru/auth";
 
-    // PKCE generators
     function generateCodeVerifier() {
       const arr = new Uint8Array(64);
       crypto.getRandomValues(arr);
@@ -39,7 +60,6 @@
         .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     }
 
-    // Save auth data with refresh expiration
     function saveAuth(data) {
       const now = Date.now();
       const auth = {
@@ -52,7 +72,6 @@
       scheduleRefresh(auth.expires_at);
     }
 
-    // Calculate and schedule refresh
     function calcRefreshTimeout(expiresAt) {
       const msLeft = expiresAt - Date.now();
       return Math.max(msLeft - 30 * 1000, 0);
@@ -72,7 +91,6 @@
       }, timeout);
     }
 
-    // Login popup
     async function login() {
       const verifier = generateCodeVerifier();
       sessionStorage.setItem('pkce_code_verifier', verifier);
@@ -90,13 +108,11 @@
       if (!popup) alert('Пожалуйста, разрешите всплывающие окна для этого сайта');
     }
 
-    // Handle callback messages
     window.addEventListener('message', async (event) => {
-      // allow only our redirect origin
       const allowedOrigin = new URL(redirectUri).origin;
       if (event.origin !== allowedOrigin) return;
 
-      const { code, state, session_state, iss } = event.data;
+      const { code } = event.data;
       if (!code) return;
 
       const verifier = sessionStorage.getItem('pkce_code_verifier');
@@ -122,9 +138,9 @@
       const data = JSON.parse(text);
       saveAuth(data);
       showUser(data.access_token);
+      showChat();
     });
 
-    // Refresh token
     async function tryRefresh(refreshToken) {
       const params = new URLSearchParams({
         grant_type   : 'refresh_token',
@@ -146,20 +162,26 @@
       showUser(data.access_token);
     }
 
-    // UI helpers
     function showUser(token) {
       document.getElementById('login-box').style.display = 'none';
       document.getElementById('user-box').style.display = 'block';
       document.getElementById('token-info').innerText = token;
     }
+    function showChat() {
+      document.getElementById('chat').style.display = 'block';
+    }
     function logout() {
       localStorage.removeItem('auth');
       clearTimeout(window._refreshTimer);
       document.getElementById('user-box').style.display = 'none';
+      document.getElementById('chat').style.display = 'none';
       document.getElementById('login-box').style.display = 'block';
+      if (window.centrifuge) {
+        window.centrifuge.disconnect();
+        window.centrifuge = null;
+      }
     }
 
-    // Initialize auth state
     window.onload = () => {
       const raw = localStorage.getItem('auth');
       if (raw) {
@@ -167,6 +189,7 @@
         const now = Date.now();
         if (now < auth.expires_at) {
           showUser(auth.access_token);
+          showChat();
           scheduleRefresh(auth.expires_at);
         } else if (now < auth.refresh_expires_at) {
           tryRefresh(auth.refresh_token);
@@ -178,6 +201,122 @@
       }
       document.getElementById('loginBtn').onclick = login;
     };
+
+    // --- Centrifugo Chat ---
+    const centrifugoUrl = "ws://localhost:8000/connection/websocket";
+    let centrifuge = null;
+    let sub = null;
+    let currentChannel = "";
+
+    // Получить preferred_username из access_token
+    function getPreferredUsername() {
+      const raw = localStorage.getItem('auth');
+      if (!raw) return "??";
+      try {
+        const { access_token } = JSON.parse(raw);
+        const payload = access_token.split('.')[1];
+        const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+        const json = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        const decoded = JSON.parse(json);
+        return decoded.preferred_username || "??";
+      } catch (e) {
+        return "??";
+      }
+    }
+
+    // Получить актуальный access_token для Centrifugo
+    function getCentrifugoToken() {
+      const raw = localStorage.getItem('auth');
+      if (!raw) return "";
+      try {
+        const { access_token } = JSON.parse(raw);
+        return access_token;
+      } catch (e) {
+        return "";
+      }
+    }
+
+    function addMessage(text, color) {
+      const messages = document.getElementById('messages');
+      const div = document.createElement('div');
+      div.textContent = text;
+      if (color) div.style.color = color;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function subscribeToChannel(channel) {
+      if (sub) {
+        sub.unsubscribe();
+        sub = null;
+      }
+      document.getElementById('messages').innerHTML = "";
+      document.getElementById('channelName').textContent = "Канал: " + channel;
+      sub = centrifuge.newSubscription(channel);
+
+      sub.on('publication', function(ctx) {
+        const user = ctx.data.user || (ctx.info && ctx.info.user) || "??";
+        addMessage(user + ": " + ctx.data.text);
+      });
+      sub.on('subscribing', function(ctx) {
+        addMessage("Подписка на канал...", "#888");
+      });
+sub.on('subscribed', function(ctx) {
+  if (ctx.error) {
+    addMessage("Ошибка подписки: " + ctx.error.message + " (код " + ctx.error.code + ")", "red");
+    document.getElementById('input').style.display = "none";
+  } else {
+    addMessage("Подписка успешна!", "#8bc34a");
+    document.getElementById('input').style.display = "";
+  }
+});
+      sub.on('error', function(ctx) {
+        addMessage("Ошибка подписки: " + JSON.stringify(ctx), "red");
+        document.getElementById('input').style.display = "none";
+      });
+      sub.subscribe();
+    }
+
+    document.getElementById('channelForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const channel = document.getElementById('channelInput').value.trim();
+      if (!channel) return;
+      if (!centrifuge) {
+        centrifuge = new Centrifuge(centrifugoUrl, {
+          token: getCentrifugoToken(),
+          getToken: () => Promise.resolve(getCentrifugoToken())
+        });
+        window.centrifuge = centrifuge;
+        centrifuge.on('connected', function(ctx) {
+          addMessage("Соединение установлено!", "#8bc34a");
+        });
+        centrifuge.on('disconnected', function(ctx) {
+          addMessage("Отключено от сервера.", "orange");
+        });
+        centrifuge.on('error', function(ctx) {
+          addMessage("Ошибка Centrifugo: " + JSON.stringify(ctx), "red");
+        });
+        centrifuge.connect();
+      } else {
+        centrifuge.setToken(getCentrifugoToken());
+      }
+      currentChannel = channel;
+      subscribeToChannel(channel);
+    });
+
+    document.getElementById('input').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const input = document.getElementById('messageInput');
+      const text = input.value.trim();
+      if (!text || !sub) return;
+      const user = getPreferredUsername();
+      centrifuge.publish(currentChannel, {user, text}).catch(function(err) {
+        addMessage("Ошибка отправки: " + JSON.stringify(err), "red");
+      });
+      input.value = '';
+    });
   </script>
 </body>
 </html>

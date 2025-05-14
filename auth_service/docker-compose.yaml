@@ -31,10 +31,10 @@ services:
       - KEYCLOAK_DATABASE_USER=bn_keycloak
       - KEYCLOAK_DATABASE_PASSWORD=bitnami
       - KEYCLOAK_DATABASE_SCHEMA_UPDATE=update
-      - PROXY_ADDRESS_FORWARDING=true                # доверять X-Forwarded-* :contentReference[oaicite:3]{index=3}
-      - KEYCLOAK_FRONTEND_URL=https://dedup-gpn.ru/auth # внешний URL для редиректов :contentReference[oaicite:4]{index=4}
-      - KC_PROXY=edge                                    # для Quarkus-версий Keycloak (если применимо) :contentReference[oaicite:5]{index=5}
-      - KC_PROXY_HEADERS=xforwarded                      # парсить нестандартные X-Forwarded-* :contentReference[oaicite:6]{index=6}
+      - PROXY_ADDRESS_FORWARDING=true                
+      - KEYCLOAK_FRONTEND_URL=https://dedup-gpn.ru/auth 
+      - KC_PROXY=edge                                   
+      - KC_PROXY_HEADERS=xforwarded                      
       - KC_HTTP_RELATIVE_PATH=/auth
     volumes:
       - ./keycloak_data:/bitnami/keycloak

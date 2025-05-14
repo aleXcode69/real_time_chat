@@ -1,0 +1,269 @@
+<!-- <!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Centrifugo Chat</title>
+    <script src="https://unpkg.com/centrifuge@5.3.0/dist/centrifuge.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #222; color: #eee; }
+        #chat { width: 400px; margin: 40px auto; background: #333; border-radius: 8px; padding: 20px; }
+        #messages { height: 300px; overflow-y: auto; background: #222; border-radius: 4px; padding: 10px; margin-bottom: 10px; }
+        #input { display: flex; }
+        #input input { flex: 1; padding: 8px; border: none; border-radius: 4px 0 0 4px; }
+        #input button { padding: 8px 16px; border: none; background: #4caf50; color: #fff; border-radius: 0 4px 4px 0; cursor: pointer; }
+        #input button:hover { background: #388e3c; }
+    </style>
+</head>
+<body>
+    <div id="chat">
+        <h2>Чат Centrifugo</h2>
+        <div id="messages"></div>
+        <form id="input">
+            <input type="text" id="messageInput" autocomplete="off" placeholder="Введите сообщение..." required />
+            <button type="submit">Отправить</button>
+        </form>
+    </div>
+    <script>
+        const centrifugoUrl = "ws://localhost:8000/connection/websocket";
+        const token = ""; // Без токена, т.к. разрешена анонимная подписка/публикация
+        const channel = "chat";
+
+        function addMessage(text, color) {
+            const messages = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.textContent = text;
+            if (color) div.style.color = color;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        const centrifuge = new Centrifuge(centrifugoUrl, { token });
+
+        const sub = centrifuge.newSubscription(channel);
+
+        sub.on('publication', function(ctx) {
+            addMessage((ctx.data.user || "??") + ": " + ctx.data.text);
+        });
+
+        sub.on('subscribing', function(ctx) {
+            addMessage("Подписка на канал...", "#888");
+        });
+        sub.on('subscribed', function(ctx) {
+            addMessage("Подписка успешна!", "#8bc34a");
+        });
+        sub.on('error', function(ctx) {
+            addMessage("Ошибка подписки: " + JSON.stringify(ctx), "red");
+            console.error("Subscription error:", ctx);
+        });
+
+        centrifuge.on('connected', function(ctx) {
+            addMessage("Соединение установлено!", "#8bc34a");
+        });
+        centrifuge.on('disconnected', function(ctx) {
+            addMessage("Отключено от сервера.", "orange");
+        });
+        centrifuge.on('error', function(ctx) {
+            addMessage("Ошибка Centrifugo: " + JSON.stringify(ctx), "red");
+            console.error("Centrifugo error:", ctx);
+        });
+        centrifuge.on('connecting', function(ctx) {
+            addMessage("Подключение... " + JSON.stringify(ctx), "#888");
+        });
+
+        sub.subscribe();
+        centrifuge.connect();
+
+        document.getElementById('input').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            if (!text) return;
+            const user = "Гость";
+            centrifuge.publish(channel, {user, text}).then(function() {
+                // Можно добавить локальное отображение, если нужно
+            }).catch(function(err) {
+                addMessage("Ошибка отправки: " + JSON.stringify(err), "red");
+                console.error("Publish error:", err);
+            });
+            input.value = '';
+        });
+    </script>
+</body>
+</html> -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- <html>
+
+<head>
+  <title>Centrifugo quick start</title>
+</head>
+
+<body>
+  <div id="counter">-</div>
+  <script src="https://unpkg.com/centrifuge@5.3.5/dist/centrifuge.js"></script>
+  <script type="text/javascript">
+    const container = document.getElementById('counter');
+
+    const centrifuge = new Centrifuge("ws://localhost:8000/connection/websocket", {
+      token: "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJhNTBsUHc5WkxzbE1WSElZZjZXVjI5cEUtYnlhNTUwV1Z0OXVIeVN4WWRJIn0.eyJleHAiOjE3NDcyMTU4NzQsImlhdCI6MTc0NzIxNTU3NCwiYXV0aF90aW1lIjoxNzQ3MjA5NjY3LCJqdGkiOiJvbnJ0cnQ6YmEwNTdlMGQtZjMxNS00YzRiLWJiYWYtNTg1MjE0MDcwNWZiIiwiaXNzIjoiaHR0cHM6Ly9kZWR1cC1ncG4ucnUvYXV0aC9yZWFsbXMvcnRjIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6IjYxOWFkNmRjLTExNWItNGZiMS1iMmU2LTIxMzFkYTFhNzVkYiIsInR5cCI6IkJlYXJlciIsImF6cCI6ImFsbHR5cGUiLCJzaWQiOiI2MWQ1ZWRhNy02ZjJhLTRmYzMtYmQ1MS0wMTY5MTEyM2Y0MzQiLCJhY3IiOiIwIiwiYWxsb3dlZC1vcmlnaW5zIjpbIioiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbIm9mZmxpbmVfYWNjZXNzIiwidW1hX2F1dGhvcml6YXRpb24iLCJkZWZhdWx0LXJvbGVzLXJ0YyJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgZW1haWwiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJPTEdBIFpBSVRTRVZBIiwicHJlZmVycmVkX3VzZXJuYW1lIjoiZmltb3oiLCJnaXZlbl9uYW1lIjoiT0xHQSIsImZhbWlseV9uYW1lIjoiWkFJVFNFVkEiLCJlbWFpbCI6Ijc2ODNhbGV4aXphaXRjZWY1QGdtYWlsLmNvbSJ9.ma3R3PyYUmbpOQ06-OivP9Rabijc0kM-IT9OojA9kwKA32uYklknPEalhVF2x1tYpTGWoOiXio1pvQKeAtXi234OmtQk-R88juWRIUiyhR4ukaYa8kMFdu8rmZgBtMK1ODW9ZSC5vLNFGhD0H12WKoPVMX5isf-8D4VpqNOwgSAItjqg3qycdo_WT3_Y_8qi8vwXuwJFVitxNju4gdpbrfm8ZB0PcHDS8x8mAPiuxh7a8JP0ucHKwU9v5eIPHaxzxF46dxiXO1573ZeBi-kCMDyg521FtWn3ZIUy4LBNS5LguHaRpIz6o366rrJkkBeMgKuNmj4X95XcNpkCd8gTIw"
+
+    });
+
+    centrifuge.on('connecting', function (ctx) {
+      console.log(`connecting: ${ctx.code}, ${ctx.reason}`);
+    }).on('connected', function (ctx) {
+      console.log(`connected over ${ctx.transport}`);
+    }).on('disconnected', function (ctx) {
+      console.log(`disconnected: ${ctx.code}, ${ctx.reason}`);
+    }).connect();
+
+    const sub = centrifuge.newSubscription("channel");
+
+    sub.on('publication', function (ctx) {
+      container.innerHTML = ctx.data.value;
+      document.title = ctx.data.value;
+    }).on('subscribing', function (ctx) {
+      console.log(`subscribing: ${ctx.code}, ${ctx.reason}`);
+    }).on('subscribed', function (ctx) {
+      console.log('subscribed', ctx);
+    }).on('unsubscribed', function (ctx) {
+      console.log(`unsubscribed: ${ctx.code}, ${ctx.reason}`);
+    }).subscribe();
+  </script>
+</body>
+
+</html> -->
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Centrifugo Dynamic Chat</title>
+  <script src="https://unpkg.com/centrifuge@5.3.5/dist/centrifuge.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #222; color: #eee; }
+    #chat { width: 400px; margin: 40px auto; background: #333; border-radius: 8px; padding: 20px; }
+    #messages { height: 300px; overflow-y: auto; background: #222; border-radius: 4px; padding: 10px; margin-bottom: 10px; }
+    #input, #channelForm { display: flex; margin-bottom: 10px; }
+    #input input, #channelForm input { flex: 1; padding: 8px; border: none; border-radius: 4px 0 0 4px; }
+    #input button, #channelForm button { padding: 8px 16px; border: none; background: #4caf50; color: #fff; border-radius: 0 4px 4px 0; cursor: pointer; }
+    #input button:hover, #channelForm button:hover { background: #388e3c; }
+    #channelName { margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <div id="chat">
+    <h2>Динамический чат Centrifugo</h2>
+    <form id="channelForm">
+      <input type="text" id="channelInput" autocomplete="off" placeholder="Введите имя канала..." required />
+      <button type="submit">Подписаться</button>
+    </form>
+    <div id="channelName"></div>
+    <div id="messages"></div>
+    <form id="input" style="display:none;">
+      <input type="text" id="messageInput" autocomplete="off" placeholder="Введите сообщение..." required />
+      <button type="submit">Отправить</button>
+    </form>
+  </div>
+  <script>
+    // Вставь свой токен, если требуется авторизация
+    const token = "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJhNTBsUHc5WkxzbE1WSElZZjZXVjI5cEUtYnlhNTUwV1Z0OXVIeVN4WWRJIn0.eyJleHAiOjE3NDcyMTY4NDYsImlhdCI6MTc0NzIxNjU0NiwiYXV0aF90aW1lIjoxNzQ3MjE2NTQ1LCJqdGkiOiJvbnJ0YWM6NjRlNjNkNTUtNDQ1Mi00YWFiLTk5N2EtM2IxMjZjYjNjMTI0IiwiaXNzIjoiaHR0cHM6Ly9kZWR1cC1ncG4ucnUvYXV0aC9yZWFsbXMvcnRjIiwiYXVkIjoiYWNjb3VudCIsInN1YiI6IjYxOWFkNmRjLTExNWItNGZiMS1iMmU2LTIxMzFkYTFhNzVkYiIsInR5cCI6IkJlYXJlciIsImF6cCI6ImFsbHR5cGUiLCJzaWQiOiI5NTE2NzI3Ny0xM2RlLTQ1NTUtYWQwYS1iZjkwMDFmMjVjNzciLCJhY3IiOiIxIiwiYWxsb3dlZC1vcmlnaW5zIjpbIioiXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbIm9mZmxpbmVfYWNjZXNzIiwidW1hX2F1dGhvcml6YXRpb24iLCJkZWZhdWx0LXJvbGVzLXJ0YyJdfSwicmVzb3VyY2VfYWNjZXNzIjp7ImFjY291bnQiOnsicm9sZXMiOlsibWFuYWdlLWFjY291bnQiLCJtYW5hZ2UtYWNjb3VudC1saW5rcyIsInZpZXctcHJvZmlsZSJdfX0sInNjb3BlIjoib3BlbmlkIHByb2ZpbGUgZW1haWwiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsIm5hbWUiOiJPTEdBIFpBSVRTRVZBIiwicHJlZmVycmVkX3VzZXJuYW1lIjoiZmltb3oiLCJnaXZlbl9uYW1lIjoiT0xHQSIsImZhbWlseV9uYW1lIjoiWkFJVFNFVkEiLCJlbWFpbCI6Ijc2ODNhbGV4aXphaXRjZWY1QGdtYWlsLmNvbSJ9.VCY3XIJGBJ2rwb5cul5KMCaXCmaN8P5lsm6JW74u8tAiLLqFG335z9dJehLmztIcekpoSzar6vMxuXvBS0AvKnoujtWg956cJuOGGtJafquOATMLRw1-O62p7l06ltrq6SOV5Of7B-Y_trLraK1KHwLSdDRLhwJsOUjwAg2hsvA1kviwV1pIx4Ll3qkQ2RTiVfnNjcOR0nKfzwwemUAjz9kgh7H62TbvsoxxD-RDwWEmgCuwd2Ts5XCR6IegxAh168Evq40WAnsQvGXQyreovxmVGl58b2I6Biqbbntzyr0NVzWtya3onxqQzI5jmIuaOk_Qii1zjggj07fvn5qbUA"
+
+; // или твой JWT
+    const centrifugoUrl = "ws://localhost:8000/connection/websocket";
+
+    let centrifuge = null;
+    let sub = null;
+    let currentChannel = "";
+
+    function addMessage(text, color) {
+      const messages = document.getElementById('messages');
+      const div = document.createElement('div');
+      div.textContent = text;
+      if (color) div.style.color = color;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function subscribeToChannel(channel) {
+      if (sub) {
+        sub.unsubscribe();
+        sub = null;
+      }
+      document.getElementById('messages').innerHTML = "";
+      document.getElementById('channelName').textContent = "Канал: " + channel;
+      sub = centrifuge.newSubscription(channel);
+
+      sub.on('publication', function(ctx) {
+        addMessage((ctx.data.user || "??") + ": " + ctx.data.text);
+      });
+      sub.on('subscribing', function(ctx) {
+        addMessage("Подписка на канал...", "#888");
+      });
+      sub.on('subscribed', function(ctx) {
+        addMessage("Подписка успешна!", "#8bc34a");
+        document.getElementById('input').style.display = "";
+      });
+      sub.on('error', function(ctx) {
+        addMessage("Ошибка подписки: " + JSON.stringify(ctx), "red");
+        document.getElementById('input').style.display = "none";
+      });
+      sub.subscribe();
+    }
+
+    document.getElementById('channelForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const channel = document.getElementById('channelInput').value.trim();
+      if (!channel) return;
+      if (!centrifuge) {
+        centrifuge = new Centrifuge(centrifugoUrl, { token });
+        centrifuge.on('connected', function(ctx) {
+          addMessage("Соединение установлено!", "#8bc34a");
+        });
+        centrifuge.on('disconnected', function(ctx) {
+          addMessage("Отключено от сервера.", "orange");
+        });
+        centrifuge.on('error', function(ctx) {
+          addMessage("Ошибка Centrifugo: " + JSON.stringify(ctx), "red");
+        });
+        centrifuge.connect();
+      }
+      currentChannel = channel;
+      subscribeToChannel(channel);
+    });
+
+    document.getElementById('input').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const input = document.getElementById('messageInput');
+      const text = input.value.trim();
+      if (!text || !sub) return;
+      const user = "Гость";
+      centrifuge.publish(currentChannel, {user, text}).catch(function(err) {
+        addMessage("Ошибка отправки: " + JSON.stringify(err), "red");
+      });
+      input.value = '';
+    });
+  </script>
+</body>
+</html>

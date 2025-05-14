@@ -11,5 +11,5 @@ func canUserSubscribe(userID string, channel string) bool {
 }
 func canUserPublish(userID string, channel string) bool {
 	log.Printf("Checking if user %s can publish to channel %s", userID, channel)
-	return false
+	return true
 }

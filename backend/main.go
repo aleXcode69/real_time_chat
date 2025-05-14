@@ -14,8 +14,9 @@ type server struct {
 }
 
 func (s *server) Subscribe(ctx context.Context, request *SubscribeRequest) (*SubscribeResponse, error) {
-	userID := request.User;
-	channel := request.Channel;
+	userID := request.User
+	channel := request.Channel
+	log.Printf("request %s", request)
 	if !canUserSubscribe(userID, channel) {
 		return &SubscribeResponse{
 			Error: &Error{
@@ -28,8 +29,9 @@ func (s *server) Subscribe(ctx context.Context, request *SubscribeRequest) (*Sub
 }
 
 func (s *server) Publish(ctx context.Context, request *PublishRequest) (*PublishResponse, error) {
-	userID := request.User;
-	channel := request.Channel;
+	userID := request.User
+	channel := request.Channel
+	log.Printf("request %s", request)
 	if !canUserPublish(userID, channel) {
 		return &PublishResponse{
 			Error: &Error{
